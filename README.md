@@ -1,8 +1,10 @@
 # CVIA — Assistente de Suporte do CV CRM (RAG)
 
 Assistente que responde perguntas com base **exclusivamente** no conteúdo da
-Base de Conhecimento do CV CRM (`https://ajuda.cvcrm.com.br`). Arquitetura RAG
-em Python, portada e adaptada do projeto de referência `SaaS_Escolar_IA`.
+Base de Ajuda (`ajuda.cvcrm.com.br`), do Portal do Desenvolvedor
+(`desenvolvedor.cvcrm.com.br`) e de documentos técnicos internos selecionados.
+Arquitetura RAG em Python, portada e adaptada do projeto de referência
+`SaaS_Escolar_IA`.
 
 O núcleo roda **offline, sem chave de API** (embeddings *mock*), o que permite
 testar o pipeline de ponta a ponta. Para produção, basta trocar o provedor de
@@ -38,13 +40,22 @@ python -m cvia.cli info
 
 ## Extrair a base completa
 
-O crawler percorre categoria → pasta → artigo do portal Freshdesk e salva tudo
-em `dados/artigos.jsonl`. Roda na sua máquina (respeita intervalo entre
-requisições e usa um *User-Agent* próprio):
+`python -m cvia.cli extrair` roda três fontes em sequência e salva tudo em
+`dados/artigos.jsonl` (respeita intervalo entre requisições e usa um
+*User-Agent* próprio):
+
+1. **Base de Ajuda** (Freshdesk) — categoria → pasta → artigo.
+2. **Portal do Desenvolvedor** (ReadMe.io) — via `sitemap.xml`: guias e
+   referência de cada endpoint de API (método, parâmetros, descrição).
+3. **Documentos locais** (`cvia/extracao/extrator_local.py`) — uma lista
+   explícita de arquivos em `cvia/extracao/extradoc/`, não um scan da pasta
+   inteira (alguns arquivos ali têm dados de cliente ou credenciais e nunca
+   devem entrar no índice nem no git — veja o `.gitignore`).
 
 ```bash
-python -m cvia.cli extrair
-python -m cvia.cli ingerir              # usa dados/artigos.jsonl por padrão
+python -m cvia.cli extrair                      # as 3 fontes
+python -m cvia.cli extrair --sem-dev --sem-local # só a base de ajuda
+python -m cvia.cli ingerir                       # usa dados/artigos.jsonl por padrão
 python -m cvia.cli perguntar "..."
 ```
 
@@ -61,15 +72,62 @@ CVIA_EMBEDDING_PROVEDOR=local CVIA_LLM_PROVEDOR=openai python -m cvia.cli pergun
 > Ao trocar o provedor de embeddings, **reingira** a base (os vetores mudam de
 > escala/dimensão) e reavalie `CVIA_LIMIAR_GROUNDING`.
 
+## Rodando como API (deploy online)
+
+`app.py` expõe o mesmo pipeline do CLI por HTTP (FastAPI):
+
+```bash
+pip install -r requirements.txt   # inclui fastapi + uvicorn
+uvicorn app:app --reload          # http://127.0.0.1:8000
+```
+
+- `GET /health` — status do índice e provedores configurados.
+- `POST /perguntar {"pergunta": "..."}` — mesma resposta do `cli.py perguntar`, em JSON.
+- `GET /docs` — Swagger UI gerado automaticamente.
+
+### Deploy com Docker
+
+```bash
+docker build -t cvia .
+docker run -p 8000:8000 --env-file .env cvia
+```
+
+O `docker-entrypoint.sh` roda `extrair` + `ingerir` automaticamente no
+primeiro start se `dados/indice/vetores.npy` não existir (leva alguns minutos
+na primeira vez). Para deploys seguintes mais rápidos, monte `dados/` como
+volume persistente para reaproveitar o índice já gerado.
+
+### Hospedagem
+
+Qualquer host que rode um `Dockerfile` (Render, Railway, Fly.io, um VPS
+próprio, etc.) serve. Passos que **exigem uma conta/serviço de terceiros** —
+e por isso ficam fora do que a automação consegue fazer sozinha:
+
+1. Criar a conta no provedor escolhido e conectar o repositório
+   `github.com/joaocss/CVIA`.
+2. Configurar as variáveis de ambiente do serviço (nunca commitar o `.env`):
+   `OPENAI_API_KEY`, `CVIA_EMBEDDING_PROVEDOR=openai`, `CVIA_LLM_PROVEDOR=openai`.
+3. Anexar um volume persistente em `/app/dados` (evita reingerir a cada deploy).
+4. Se o assistente for ficar acessível para clientes externos (não só o time
+   interno), revisar `cvia/extracao/extrator_local.py` antes: o repositório
+   público não inclui `origemcv_leads.md` (relatório de bug interno) nem os
+   arquivos com dados de cliente — eles só existem na máquina onde a extração
+   local foi rodada, então um deploy a partir do GitHub já sai sem esse
+   conteúdo por padrão.
+
 ## Estrutura
 
 ```
 CVIA/
+├── app.py                    # API HTTP (FastAPI) para deploy online
+├── Dockerfile / docker-entrypoint.sh
 ├── config.py                 # caminhos, categorias, modelos, limiares
 ├── cvia/
 │   ├── extracao/
-│   │   ├── extrator_freshdesk.py   # crawler categoria→pasta→artigo
-│   │   └── limpeza.py              # HTML → título + texto limpo
+│   │   ├── extrator_freshdesk.py     # crawler ajuda.cvcrm.com.br (categoria→pasta→artigo)
+│   │   ├── extrator_desenvolvedor.py # crawler desenvolvedor.cvcrm.com.br (sitemap + ssr-props)
+│   │   ├── extrator_local.py         # allowlist de documentos locais (extradoc/)
+│   │   └── limpeza.py                # HTML → título + texto limpo
 │   ├── ia/
 │   │   ├── tipos.py                # interfaces (Protocol): embeddings, LLM, repositório
 │   │   ├── fabrica_embeddings.py   # seleciona mock | local | openai

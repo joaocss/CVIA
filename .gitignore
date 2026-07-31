@@ -7,7 +7,8 @@ dados/artigos.jsonl
 .venv/
 .claude/
 *.log
-extracao_log.txt
+*_log.txt
+supabase/
 
 # Scripts avulsos/exploratorios anteriores ao pipeline atual (cvia/), nao
 # fazem parte do projeto mantido.
@@ -23,3 +24,8 @@ cvia/extracao/extradoc/Explicacao_Suporte_Clicksign_Reserva1597.md
 cvia/extracao/extradoc/Resumo_Suporte_Clicksign_Reserva1597.md
 cvia/extracao/extradoc/origemcv_leads.md
 cvia/extracao/extradoc/erp-uau-v2.skill
+
+# Contem token de API real em texto puro (credencial, nao PII de doc) -
+# NUNCA commitar.
+cvia/extracao/extradoc/teste_brecha_origemcv.py
+cvia/extracao/extradoc/teste_lead_origemcv.py

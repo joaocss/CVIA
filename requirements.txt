@@ -11,3 +11,7 @@ lxml>=5.0
 
 # Provedor OpenAI (embeddings + LLM), requer OPENAI_API_KEY
 openai>=1.40
+
+# Servidor web (deploy online)
+fastapi>=0.110
+uvicorn[standard]>=0.29
