@@ -106,6 +106,13 @@ class RespostaSaida(BaseModel):
     fontes: list[FonteSaida]
 
 
+class RetomarSaida(BaseModel):
+    tem_historico: bool
+    ultima_pergunta: str | None = None
+    quando: str | None = None
+    historico: list[tuple[str, str]] = []
+
+
 @app.get("/health")
 def health() -> dict:
     repo = criar_repositorio().carregar()
@@ -167,6 +174,27 @@ def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
         melhor_score=resultado.melhor_score,
         modelo=resultado.modelo,
         fontes=fontes_saida,
+    )
+
+
+@app.get("/sessao/retomar", response_model=RetomarSaida)
+def sessao_retomar(sessao_id: str = Query(...)) -> RetomarSaida:
+    """Consultado ao abrir o chat: se a mesma sessao (futuramente o mesmo
+    usuario autenticado pelo Freshdesk) tiver conversa recente registrada,
+    devolve o suficiente pra UI perguntar se a pessoa quer continuar de onde
+    parou. Best-effort: se o log estiver desativado, so diz que nao ha
+    historico em vez de quebrar a abertura do chat."""
+    reg = _log()
+    if not reg.ativo:
+        return RetomarSaida(tem_historico=False)
+    conversa = reg.ultima_conversa(sessao_id=sessao_id)
+    if not conversa:
+        return RetomarSaida(tem_historico=False)
+    return RetomarSaida(
+        tem_historico=True,
+        ultima_pergunta=conversa["ultima_pergunta"],
+        quando=conversa["quando"],
+        historico=[tuple(par) for par in conversa["historico"]],
     )
 
 

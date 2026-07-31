@@ -55,6 +55,41 @@
   }
   #status-badge.ok { background: rgba(0,179,137,0.25); color: #E3FFF9; }
   #status-badge.erro { background: rgba(192,57,43,0.3); color: #ffd8d3; }
+  #btn-nova-conversa {
+    background: rgba(255,255,255,0.12);
+    color: #C7D6E0;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  #btn-nova-conversa:hover { background: rgba(255,255,255,0.22); color: #fff; }
+
+  .retomar-banner {
+    margin: 16px 16px 0;
+    background: #fff;
+    border: 1px solid var(--card-border);
+    border-left: 3px solid var(--teal);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+  .retomar-banner p { margin: 0 0 4px; color: var(--navy); }
+  .retomar-banner .quando { color: var(--text-muted); font-size: 11.5px; margin-bottom: 10px; }
+  .retomar-banner .acoes { display: flex; gap: 8px; }
+  .retomar-banner button {
+    border-radius: 999px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; border: 1px solid transparent;
+  }
+  .retomar-banner .continuar { background: var(--teal); color: #fff; }
+  .retomar-banner .continuar:hover { background: var(--teal-dark); }
+  .retomar-banner .nova { background: #fff; color: var(--navy); border-color: var(--card-border); }
+  .retomar-banner .nova:hover { border-color: var(--teal); }
+
+  .divisor-retomada {
+    text-align: center; font-size: 11px; color: var(--text-muted);
+    margin: 4px 16px; padding-top: 8px; border-top: 1px dashed var(--card-border);
+  }
 
   #mensagens {
     flex: 1;
@@ -206,6 +241,7 @@
       <h1>CVIA</h1>
       <p>Assistente da Base de Conhecimento CV CRM</p>
     </div>
+    <button id="btn-nova-conversa" title="Limpa o contexto atual e começa do zero">nova conversa</button>
     <div id="status-badge">verificando…</div>
   </header>
 
@@ -237,8 +273,23 @@ const campo = document.getElementById('campo');
 const composer = document.getElementById('composer');
 const enviarBtn = document.getElementById('enviar');
 const statusBadge = document.getElementById('status-badge');
+const btnNovaConversa = document.getElementById('btn-nova-conversa');
 let historico = [];
 let carregando = false;
+
+// Identificador anonimo da sessao — vira o "usuario" nas estatisticas do
+// painel ate a autenticacao via API do Freshdesk existir. Guardado no
+// navegador, sobrevive a fechar a aba (diferente do historico em si, que
+// e reconstruido do servidor a cada carregamento via /sessao/retomar).
+function getSessaoId() {
+  let id = localStorage.getItem('cvia_sessao_id');
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    localStorage.setItem('cvia_sessao_id', id);
+  }
+  return id;
+}
+const sessaoId = getSessaoId();
 
 async function checarSaude() {
   try {
@@ -257,6 +308,78 @@ async function checarSaude() {
   }
 }
 checarSaude();
+
+function fmtQuando(iso) {
+  try {
+    // postgres manda "YYYY-MM-DD HH:MM:SS+00:00"; troca o espaco por "T"
+    // pra garantir parse consistente entre navegadores.
+    const d = new Date(iso.replace(' ', 'T'));
+    const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+    if (diffMin < 2) return 'agora há pouco';
+    if (diffMin < 60) return `há ${diffMin} min`;
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return `há ${diffH}h`;
+    const diffD = Math.round(diffH / 24);
+    return `há ${diffD} dia${diffD > 1 ? 's' : ''}`;
+  } catch (e) { return ''; }
+}
+
+async function checarRetomar() {
+  try {
+    const r = await fetch(`/sessao/retomar?sessao_id=${encodeURIComponent(sessaoId)}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.tem_historico) return;
+    mostrarBannerRetomar(d);
+  } catch (e) { /* sem retomada, segue com o estado vazio normal */ }
+}
+
+function mostrarBannerRetomar(d) {
+  limparEstadoVazio();
+  const banner = document.createElement('div');
+  banner.className = 'retomar-banner';
+  banner.innerHTML = `
+    <p>Você estava perguntando sobre: <strong>"${escapeHtml(d.ultima_pergunta)}"</strong></p>
+    <div class="quando">${escapeHtml(fmtQuando(d.quando))} · quer continuar esse assunto?</div>
+    <div class="acoes">
+      <button class="continuar">Continuar de onde parei</button>
+      <button class="nova">Começar assunto novo</button>
+    </div>
+  `;
+  mensagensEl.appendChild(banner);
+
+  banner.querySelector('.continuar').addEventListener('click', () => {
+    banner.remove();
+    historico = d.historico.slice(-6);
+    for (const [autor, texto] of d.historico) {
+      adicionarMensagem(autor === 'usuario' ? 'usuario' : 'assistente', texto);
+    }
+    const divisor = document.createElement('div');
+    divisor.className = 'divisor-retomada';
+    divisor.textContent = 'conversa retomada · continue a partir daqui';
+    mensagensEl.appendChild(divisor);
+    campo.focus();
+  });
+  banner.querySelector('.nova').addEventListener('click', () => {
+    banner.remove();
+    mostrarEstadoVazioSeVazio();
+  });
+}
+
+function mostrarEstadoVazioSeVazio() {
+  if (mensagensEl.children.length === 0) {
+    mensagensEl.appendChild(estadoVazio);
+  }
+}
+
+btnNovaConversa.addEventListener('click', () => {
+  historico = [];
+  mensagensEl.innerHTML = '';
+  mensagensEl.appendChild(estadoVazio);
+  campo.focus();
+});
+
+checarRetomar();
 
 function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -326,7 +449,7 @@ async function perguntar(pergunta) {
     const r = await fetch('/perguntar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pergunta, historico })
+      body: JSON.stringify({ pergunta, historico, sessao_id: sessaoId })
     });
     removerDigitando();
     if (!r.ok) {

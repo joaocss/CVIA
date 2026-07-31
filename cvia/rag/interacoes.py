@@ -168,6 +168,42 @@ class RegistradorInteracoes:
             for i, a, t, u in linhas
         ]
 
+    def ultima_conversa(
+        self, sessao_id: str | None, usuario_id: str | None = None, limite: int = 6
+    ) -> dict | None:
+        """Retorna a conversa mais recente do mesmo usuario/sessao, pra oferecer
+        "continuar de onde parou". Prioriza usuario_id (quando a autenticacao via
+        Freshdesk existir) e cai para sessao_id enquanto o usuario for anonimo —
+        so troca de fonte, o resto do fluxo nao muda."""
+        if not self.ativo or (not usuario_id and not sessao_id):
+            return None
+        if usuario_id:
+            condicao, valor = "usuario_id = %s", usuario_id
+        else:
+            condicao, valor = "sessao_id = %s", sessao_id
+        with self._conn.cursor() as cur:
+            cur.execute(
+                f"""select pergunta, resposta, criado_em
+                    from {TABELA}
+                    where {condicao}
+                    order by criado_em desc
+                    limit %s;""",
+                (valor, limite),
+            )
+            linhas = cur.fetchall()
+        if not linhas:
+            return None
+        linhas = list(reversed(linhas))  # ordem cronologica
+        historico = []
+        for pergunta, resposta, _ in linhas:
+            historico.append(["usuario", pergunta])
+            historico.append(["assistente", resposta])
+        return {
+            "ultima_pergunta": linhas[-1][0],
+            "quando": str(linhas[-1][2]),
+            "historico": historico,
+        }
+
     def listar(
         self,
         limite: int = 50,
