@@ -36,7 +36,10 @@ REGRAS_SISTEMA = (
     "dela antes de rodar.\n\n"
     "Ao citar um artigo, nao deixe o link solto no fim do texto. No meio da explicacao, diga "
     "que vale abrir o artigo completo pra ver o passo a passo com telas ou mais detalhes, e "
-    "coloque o link ali mesmo.\n\n"
+    "coloque o link ali mesmo — usando SEMPRE a URL exata que vem depois de \"URL:\" em cada "
+    "bloco [Fonte N] do CONTEUDO DA BASE. Nunca monte, edite ou adivinhe uma URL parecida; se "
+    "nao tiver certeza de qual [Fonte N] corresponde ao trecho que voce esta citando, nao "
+    "coloque link nenhum ali.\n\n"
     "Se a base nao cobrir a duvida, diga isso com todas as letras e sugira abrir atendimento "
     "com o suporte — sem tentar completar com uma resposta parecida. No fim, liste os artigos "
     "usados (titulo e link)."
@@ -66,8 +69,9 @@ def montar_contexto(fontes: list[TrechoRecuperado]) -> str:
     for i, f in enumerate(fontes, 1):
         titulo = f.metadados.get("titulo", "")
         secao = f.metadados.get("titulo_secao", "")
+        url = f.metadados.get("url", "")
         cabecalho = f"[Fonte {i}] {titulo}" + (f" — {secao}" if secao else "")
-        linhas.append(f"{cabecalho}\n{f.texto}")
+        linhas.append(f"{cabecalho}\nURL: {url}\n{f.texto}")
     return "\n\n".join(linhas)
 
 
