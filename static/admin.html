@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CVIA — Painel de Gestor</title>
+<style>
+  :root {
+    --navy: #12344D;
+    --navy-dark: #0c2536;
+    --teal: #00B389;
+    --teal-dark: #088273;
+    --teal-light: #E3FFF9;
+    --bg: #F3F3FC;
+    --card-border: #EBEFF3;
+    --text-muted: #757575;
+    --danger: #C0392B;
+    --danger-bg: #FBEAE8;
+    --warn: #B8860B;
+    --warn-bg: #FBF3DC;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--navy);
+  }
+  a { color: var(--teal-dark); }
+
+  header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .logo-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: var(--teal);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: var(--navy-dark);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header p { font-size: 11.5px; margin: 1px 0 0; color: #C7D6E0; }
+  header nav { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  header nav a { color: #C7D6E0; text-decoration: none; font-size: 12.5px; }
+  header nav a:hover { color: #fff; }
+  #sel-periodo {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font-size: 12.5px;
+  }
+  #sel-periodo option { color: #12344D; }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
+
+  /* --- login --- */
+  #login-wrap {
+    max-width: 380px; margin: 90px auto; text-align: center;
+    background: #fff; border: 1px solid var(--card-border); border-radius: 14px;
+    padding: 32px 28px;
+  }
+  #login-wrap .logo-mark { margin: 0 auto 16px; width: 46px; height: 46px; font-size: 19px; }
+  #login-wrap h2 { margin: 0 0 6px; font-size: 17px; }
+  #login-wrap p { color: var(--text-muted); font-size: 13px; margin: 0 0 18px; }
+  #login-wrap input {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--card-border); font-size: 14px; margin-bottom: 10px;
+  }
+  #login-wrap input:focus { outline: none; border-color: var(--teal); }
+  #login-wrap button {
+    width: 100%; padding: 10px; border: none; border-radius: 10px;
+    background: var(--teal); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  #login-wrap button:hover { background: var(--teal-dark); }
+  #login-erro { color: var(--danger); font-size: 12.5px; margin-top: 8px; min-height: 16px; }
+
+  /* --- cards --- */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .card {
+    background: #fff; border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .card .rotulo { font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; }
+  .card .valor { font-size: 24px; font-weight: 700; color: var(--navy); }
+  .card .valor.alerta { color: var(--danger); }
+  .card .sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  section { margin-bottom: 26px; }
+  section h3 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-muted); margin: 0 0 10px;
+  }
+  .painel {
+    background: #fff; border: 1px solid var(--card-border); border-radius: 12px;
+    padding: 16px;
+  }
+
+  /* --- grafico --- */
+  #grafico-wrap { overflow-x: auto; }
+  #grafico { display: block; }
+  .barra-total { fill: var(--teal-light); }
+  .barra-recusada { fill: var(--danger); opacity: .55; }
+  .eixo-texto { fill: var(--text-muted); font-size: 9px; }
+  .legenda { display: flex; gap: 16px; font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
+  .legenda span { display: inline-flex; align-items: center; gap: 5px; }
+  .legenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* --- tabelas --- */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 7px 10px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .trunc { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 600; white-space: nowrap;
+  }
+  .badge.ok { background: var(--teal-light); color: var(--teal-dark); }
+  .badge.recusado { background: var(--warn-bg); color: var(--warn); }
+  .badge.guardrail { background: var(--warn-bg); color: var(--warn); margin-right: 4px; }
+  .badge.suspeita { background: var(--danger-bg); color: var(--danger); }
+  .badge.neutro { background: #F0F1F5; color: var(--text-muted); }
+
+  .filtros { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 14px; font-size: 12.5px; }
+  .filtros label { display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--navy); }
+  .filtros input[type=text] {
+    flex: 1; min-width: 180px; padding: 7px 10px; border-radius: 8px;
+    border: 1px solid var(--card-border); font-size: 12.5px;
+  }
+  .filtros input[type=text]:focus { outline: none; border-color: var(--teal); }
+
+  .linha-expandida td { background: #FBFBFE; }
+  .detalhe { font-size: 12px; line-height: 1.5; }
+  .detalhe .rot { color: var(--text-muted); font-weight: 600; margin-top: 8px; }
+  .detalhe .rot:first-child { margin-top: 0; }
+  .linha-clicavel { cursor: pointer; }
+  .linha-clicavel:hover { background: #FAFBFF; }
+
+  .paginacao { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+  .paginacao button {
+    background: #fff; border: 1px solid var(--card-border); border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; cursor: pointer; color: var(--navy);
+  }
+  .paginacao button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .vazio { text-align: center; color: var(--text-muted); padding: 30px 0; font-size: 13px; }
+  .nota-heuristica {
+    font-size: 11px; color: var(--text-muted); margin-top: 8px; padding: 8px 10px;
+    background: #F7F8FB; border-radius: 8px; border-left: 3px solid var(--teal);
+  }
+  #app-wrap { display: none; }
+</style>
+</head>
+<body>
+
+<div id="login-wrap">
+  <div class="logo-mark">CV</div>
+  <h2>Painel de Gestor</h2>
+  <p>Acesso restrito. Cole o token de administrador.</p>
+  <input type="password" id="campo-token" placeholder="Token de admin" autofocus>
+  <button id="btn-entrar">Entrar</button>
+  <div id="login-erro"></div>
+</div>
+
+<div id="app-wrap">
+  <header>
+    <div class="logo-mark">CV</div>
+    <div>
+      <h1>CVIA — Painel de Gestor</h1>
+      <p>Uso, qualidade e guardrails do assistente</p>
+    </div>
+    <nav>
+      <select id="sel-periodo">
+        <option value="7">últimos 7 dias</option>
+        <option value="30" selected>últimos 30 dias</option>
+        <option value="90">últimos 90 dias</option>
+      </select>
+      <a href="/">← voltar ao chat</a>
+      <a href="#" id="btn-sair">sair</a>
+    </nav>
+  </header>
+
+  <main>
+    <div id="conteudo"></div>
+  </main>
+</div>
+
+<script>
+const API = '';
+let TOKEN = sessionStorage.getItem('cvia_admin_token') || '';
+
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+function fmtNum(n) { return (n ?? 0).toLocaleString('pt-BR'); }
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function fmtData(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return iso; }
+}
+
+async function chamarApi(caminho) {
+  const r = await fetch(API + caminho, { headers: { 'X-Admin-Token': TOKEN } });
+  if (r.status === 401 || r.status === 403) {
+    sessionStorage.removeItem('cvia_admin_token');
+    mostrarLogin('Token invalido ou painel desabilitado.');
+    throw new Error('unauthorized');
+  }
+  if (!r.ok) throw new Error('Erro ' + r.status);
+  return r.json();
+}
+
+function mostrarLogin(erro) {
+  document.getElementById('login-wrap').style.display = 'block';
+  document.getElementById('app-wrap').style.display = 'none';
+  document.getElementById('login-erro').textContent = erro || '';
+}
+
+function mostrarApp() {
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app-wrap').style.display = 'block';
+}
+
+document.getElementById('btn-entrar').addEventListener('click', tentarLogin);
+document.getElementById('campo-token').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tentarLogin();
+});
+document.getElementById('btn-sair').addEventListener('click', (e) => {
+  e.preventDefault();
+  sessionStorage.removeItem('cvia_admin_token');
+  location.reload();
+});
+
+async function tentarLogin() {
+  const valor = document.getElementById('campo-token').value.trim();
+  if (!valor) return;
+  TOKEN = valor;
+  try {
+    await chamarApi('/admin/api/resumo?dias=7');
+    sessionStorage.setItem('cvia_admin_token', TOKEN);
+    mostrarApp();
+    carregarTudo();
+  } catch (e) {
+    mostrarLogin('Token invalido.');
+  }
+}
+
+document.getElementById('sel-periodo').addEventListener('change', carregarTudo);
+
+// --- grafico SVG simples (barras total + recusadas sobrepostas) ---
+function renderGrafico(serie) {
+  const largura = Math.max(600, serie.length * 26);
+  const altura = 160;
+  const margemBaixo = 22;
+  const maxVal = Math.max(1, ...serie.map(d => d.total));
+  const larguraBarra = (largura / Math.max(serie.length, 1)) * 0.6;
+
+  let barras = '';
+  serie.forEach((d, i) => {
+    const x = (largura / serie.length) * i + (largura / serie.length - larguraBarra) / 2;
+    const hTotal = (d.total / maxVal) * (altura - margemBaixo);
+    const hRec = (d.recusadas / maxVal) * (altura - margemBaixo);
+    const yTotal = altura - margemBaixo - hTotal;
+    const yRec = altura - margemBaixo - hRec;
+    const rotulo = d.dia.slice(5); // MM-DD
+    const mostrarRotulo = serie.length <= 14 || i % Math.ceil(serie.length / 14) === 0;
+    barras += `<rect class="barra-total" x="${x}" y="${yTotal}" width="${larguraBarra}" height="${hTotal}" rx="2">
+      <title>${d.dia}: ${d.total} perguntas, ${d.recusadas} recusadas</title></rect>`;
+    if (d.recusadas > 0) {
+      barras += `<rect class="barra-recusada" x="${x}" y="${yRec}" width="${larguraBarra}" height="${hRec}" rx="2"></rect>`;
+    }
+    if (mostrarRotulo) {
+      barras += `<text class="eixo-texto" x="${x + larguraBarra / 2}" y="${altura - 6}" text-anchor="middle">${rotulo}</text>`;
+    }
+  });
+
+  document.getElementById('grafico').outerHTML =
+    `<svg id="grafico" width="${largura}" height="${altura}" viewBox="0 0 ${largura} ${altura}">${barras}</svg>`;
+}
+
+// --- carregamento principal ---
+async function carregarTudo() {
+  const dias = document.getElementById('sel-periodo').value;
+  const conteudo = document.getElementById('conteudo');
+  conteudo.innerHTML = '<div class="vazio">Carregando…</div>';
+
+  try {
+    const [resumo, serie, usuarios] = await Promise.all([
+      chamarApi(`/admin/api/resumo?dias=${dias}`),
+      chamarApi(`/admin/api/serie-diaria?dias=${dias}`),
+      chamarApi(`/admin/api/usuarios?dias=${dias}&limite=10`),
+    ]);
+
+    const taxaRecusa = resumo.total > 0 ? resumo.recusadas / resumo.total : 0;
+    const taxaGuardrail = resumo.total > 0 ? resumo.com_guardrail / resumo.total : 0;
+
+    conteudo.innerHTML = `
+      <div class="cards">
+        <div class="card"><div class="rotulo">Perguntas</div><div class="valor">${fmtNum(resumo.total)}</div></div>
+        <div class="card"><div class="rotulo">Sessões únicas</div><div class="valor">${fmtNum(resumo.sessoes_unicas)}</div><div class="sub">antes do login Freshdesk, é por navegador</div></div>
+        <div class="card"><div class="rotulo">Taxa de recusa</div><div class="valor ${taxaRecusa > 0.3 ? 'alerta' : ''}">${fmtPct(taxaRecusa)}</div></div>
+        <div class="card"><div class="rotulo">Score médio</div><div class="valor">${(resumo.score_medio ?? 0).toFixed(3)}</div></div>
+        <div class="card"><div class="rotulo">Alertas de guardrail</div><div class="valor ${resumo.com_guardrail > 0 ? 'alerta' : ''}">${fmtNum(resumo.com_guardrail)}</div><div class="sub">${fmtPct(taxaGuardrail)} das perguntas</div></div>
+        <div class="card"><div class="rotulo">Suspeita de alucinação</div><div class="valor ${resumo.suspeita_alucinacao > 0 ? 'alerta' : ''}">${fmtNum(resumo.suspeita_alucinacao)}</div></div>
+        <div class="card"><div class="rotulo">Tempo médio</div><div class="valor">${((resumo.duracao_media_ms ?? 0) / 1000).toFixed(1)}s</div></div>
+      </div>
+
+      <section>
+        <h3>Perguntas por dia</h3>
+        <div class="painel">
+          <div id="grafico-wrap"><svg id="grafico"></svg></div>
+          <div class="legenda">
+            <span><i style="background:var(--teal-light)"></i> total</span>
+            <span><i style="background:var(--danger); opacity:.55"></i> recusadas (sem base na documentação)</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3>Usuários mais ativos</h3>
+        <div class="painel">
+          <table>
+            <thead><tr><th>Identificador</th><th>Tipo</th><th class="num">Perguntas</th><th>Última pergunta</th></tr></thead>
+            <tbody id="corpo-usuarios"></tbody>
+          </table>
+          <div class="nota-heuristica">Sem autenticação via Freshdesk ainda, o identificador é uma sessão anônima por navegador. Quando o login estiver plugado, isso vira nome/e-mail do usuário automaticamente.</div>
+        </div>
+      </section>
+
+      <section>
+        <h3>Interações</h3>
+        <div class="painel">
+          <div class="filtros">
+            <input type="text" id="campo-busca" placeholder="Buscar por texto na pergunta ou resposta…">
+            <label><input type="checkbox" id="chk-recusadas"> só recusadas</label>
+            <label><input type="checkbox" id="chk-guardrail"> só com guardrail</label>
+            <label><input type="checkbox" id="chk-suspeita"> só suspeita de alucinação</label>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Quando</th><th>Sessão/Usuário</th><th>Pergunta</th>
+              <th class="num">Score</th><th>Status</th><th>Sinalizações</th>
+            </tr></thead>
+            <tbody id="corpo-interacoes"></tbody>
+          </table>
+          <div class="paginacao">
+            <span id="txt-paginacao"></span>
+            <div>
+              <button id="btn-anterior">← anterior</button>
+              <button id="btn-proximo">próximo →</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+
+    renderGrafico(serie);
+    renderUsuarios(usuarios);
+
+    let offset = 0;
+    const limite = 25;
+    const recarregarInteracoes = () => carregarInteracoes(offset, limite);
+    document.getElementById('btn-anterior').addEventListener('click', () => {
+      offset = Math.max(0, offset - limite);
+      recarregarInteracoes();
+    });
+    document.getElementById('btn-proximo').addEventListener('click', () => {
+      offset += limite;
+      recarregarInteracoes();
+    });
+    ['chk-recusadas', 'chk-guardrail', 'chk-suspeita'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => { offset = 0; recarregarInteracoes(); });
+    });
+    let debounce;
+    document.getElementById('campo-busca').addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => { offset = 0; recarregarInteracoes(); }, 350);
+    });
+
+    window._cviaAdminState = { get offset() { return offset; }, set offset(v) { offset = v; } };
+    async function carregarInteracoes(off, lim) {
+      const params = new URLSearchParams({
+        limite: lim, offset: off,
+        so_recusadas: document.getElementById('chk-recusadas').checked,
+        so_guardrail: document.getElementById('chk-guardrail').checked,
+        so_suspeita: document.getElementById('chk-suspeita').checked,
+      });
+      const busca = document.getElementById('campo-busca').value.trim();
+      if (busca) params.set('busca', busca);
+      const dados = await chamarApi('/admin/api/interacoes?' + params.toString());
+      renderInteracoes(dados);
+      document.getElementById('txt-paginacao').textContent =
+        `${dados.total === 0 ? 0 : off + 1}–${Math.min(off + lim, dados.total)} de ${dados.total}`;
+      document.getElementById('btn-anterior').disabled = off === 0;
+      document.getElementById('btn-proximo').disabled = off + lim >= dados.total;
+    }
+    carregarInteracoes(0, limite);
+
+  } catch (e) {
+    if (e.message !== 'unauthorized') {
+      conteudo.innerHTML = `<div class="vazio">Não foi possível carregar o painel: ${escapeHtml(e.message)}<br>
+        (o log de interações precisa de DATABASE_URL configurado)</div>`;
+    }
+  }
+}
+
+function renderUsuarios(usuarios) {
+  const corpo = document.getElementById('corpo-usuarios');
+  if (!usuarios.length) {
+    corpo.innerHTML = '<tr><td colspan="4" class="vazio">Sem dados no período.</td></tr>';
+    return;
+  }
+  corpo.innerHTML = usuarios.map(u => `
+    <tr>
+      <td>${escapeHtml(u.identificador)}</td>
+      <td>${u.autenticado ? '<span class="badge ok">autenticado</span>' : '<span class="badge neutro">sessão anônima</span>'}</td>
+      <td class="num">${fmtNum(u.total_perguntas)}</td>
+      <td>${fmtData(u.ultima_pergunta)}</td>
+    </tr>
+  `).join('');
+}
+
+function badgesSinalizacao(item) {
+  let html = '';
+  const eventos = [...(item.guardrail_entrada || []), ...(item.guardrail_saida || [])];
+  const categorias = [...new Set(eventos.map(e => e.categoria))];
+  for (const cat of categorias) {
+    html += `<span class="badge guardrail">${escapeHtml(cat)}</span>`;
+  }
+  if (item.fiel === false) html += '<span class="badge suspeita">possível alucinação</span>';
+  if (!html) html = '<span class="badge neutro">—</span>';
+  return html;
+}
+
+function renderInteracoes(dados) {
+  const corpo = document.getElementById('corpo-interacoes');
+  if (!dados.itens.length) {
+    corpo.innerHTML = '<tr><td colspan="6" class="vazio">Nenhuma interação encontrada.</td></tr>';
+    return;
+  }
+  corpo.innerHTML = '';
+  dados.itens.forEach((item, idx) => {
+    const linha = document.createElement('tr');
+    linha.className = 'linha-clicavel';
+    linha.innerHTML = `
+      <td>${fmtData(item.criado_em)}</td>
+      <td>${escapeHtml(item.usuario_email || item.sessao_id || '—').slice(0, 22)}</td>
+      <td class="trunc" title="${escapeHtml(item.pergunta)}">${escapeHtml(item.pergunta)}</td>
+      <td class="num">${item.melhor_score != null ? item.melhor_score.toFixed(3) : '—'}</td>
+      <td>${item.recusado ? '<span class="badge recusado">recusado</span>' : '<span class="badge ok">respondido</span>'}</td>
+      <td>${badgesSinalizacao(item)}</td>
+    `;
+    const detalhe = document.createElement('tr');
+    detalhe.style.display = 'none';
+    detalhe.className = 'linha-expandida';
+    const eventos = [...(item.guardrail_entrada || []), ...(item.guardrail_saida || [])];
+    const fontes = item.fontes || [];
+    detalhe.innerHTML = `<td colspan="6"><div class="detalhe">
+      <div class="rot">Pergunta completa</div><div>${escapeHtml(item.pergunta)}</div>
+      <div class="rot">Resposta</div><div>${escapeHtml(item.resposta)}</div>
+      ${eventos.length ? `<div class="rot">Guardrail</div><div>${eventos.map(e => `${escapeHtml(e.categoria)} (${escapeHtml(e.severidade)}): ${escapeHtml(e.detalhe)}`).join('<br>')}</div>` : ''}
+      ${item.fiel !== null && item.fiel !== undefined ? `<div class="rot">Verificação de fidelidade</div><div>${item.fiel ? 'sustentada pelas fontes' : 'possível alucinação'} — ${escapeHtml(item.fiel_motivo || '')}</div>` : ''}
+      ${fontes.length ? `<div class="rot">Fontes usadas</div><div>${fontes.map(f => `${escapeHtml(f.titulo)} (score ${f.score})`).join('<br>')}</div>` : ''}
+      <div class="rot">Duração</div><div>${item.duracao_ms ? (item.duracao_ms / 1000).toFixed(1) + 's' : '—'} · modelo ${escapeHtml(item.modelo || '—')}</div>
+    </div></td>`;
+    linha.addEventListener('click', () => {
+      detalhe.style.display = detalhe.style.display === 'none' ? 'table-row' : 'none';
+    });
+    corpo.appendChild(linha);
+    corpo.appendChild(detalhe);
+  });
+}
+
+// --- boot ---
+if (TOKEN) {
+  chamarApi('/admin/api/resumo?dias=7').then(() => {
+    mostrarApp();
+    carregarTudo();
+  }).catch(() => {});
+} else {
+  mostrarLogin();
+}
+</script>
+</body>
+</html>

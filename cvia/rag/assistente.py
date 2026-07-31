@@ -32,7 +32,8 @@ class ResultadoAssistente:
     recusado: bool
     resposta: str
     fontes: list[TrechoRecuperado] = field(default_factory=list)
-    eventos: list[EventoGuardrail] = field(default_factory=list)
+    eventos_entrada: list[EventoGuardrail] = field(default_factory=list)
+    eventos_saida: list[EventoGuardrail] = field(default_factory=list)
     melhor_score: float = 0.0
     modelo: str | None = None
 
@@ -44,7 +45,7 @@ class Dependencias:
     repositorio: RepositorioTrechos
 
 
-def _montar_contexto(fontes: list[TrechoRecuperado]) -> str:
+def montar_contexto(fontes: list[TrechoRecuperado]) -> str:
     linhas = []
     for i, f in enumerate(fontes, 1):
         titulo = f.metadados.get("titulo", "")
@@ -72,7 +73,7 @@ def responder(
     historico: list[tuple[str, str]] | None = None,
 ) -> ResultadoAssistente:
     historico = historico or []
-    eventos = guardrail_entrada(pergunta)
+    eventos_entrada = guardrail_entrada(pergunta)
     pergunta_segura = minimizar_pii(pergunta)
 
     vetor = dep.embeddings.gerar(pergunta_segura)
@@ -82,15 +83,16 @@ def responder(
     if not fontes or melhor < config.LIMIAR_GROUNDING:
         return ResultadoAssistente(
             recusado=True, resposta=MENSAGEM_SEM_BASE, fontes=fontes,
-            eventos=eventos, melhor_score=round(melhor, 3),
+            eventos_entrada=eventos_entrada, melhor_score=round(melhor, 3),
         )
 
-    contexto = _montar_contexto(fontes)
+    contexto = montar_contexto(fontes)
     prompt = _montar_prompt(pergunta_segura, contexto, historico)
     saida = dep.llm.gerar(prompt, max_tokens=1200)
-    texto, ev_saida = guardrail_saida(saida.texto)
+    texto, eventos_saida = guardrail_saida(saida.texto)
 
     return ResultadoAssistente(
         recusado=False, resposta=texto, fontes=fontes,
-        eventos=eventos + ev_saida, melhor_score=round(melhor, 3), modelo=saida.modelo,
+        eventos_entrada=eventos_entrada, eventos_saida=eventos_saida,
+        melhor_score=round(melhor, 3), modelo=saida.modelo,
     )

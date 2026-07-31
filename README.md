@@ -85,8 +85,27 @@ uvicorn app:app --reload          # http://127.0.0.1:8000 → chat web
 
 - `GET /` — interface de chat (HTML/CSS/JS puro, sem build step).
 - `GET /health` — status do índice e provedores configurados.
-- `POST /perguntar {"pergunta": "...", "historico": [...]}` — mesma resposta do `cli.py perguntar`, em JSON.
+- `POST /perguntar {"pergunta": "...", "historico": [...], "sessao_id": "..."}` — mesma resposta do `cli.py perguntar`, em JSON. `sessao_id` é gerado no navegador (localStorage) e serve pra agrupar "usuários" no painel antes de existir login de verdade.
 - `GET /docs` — Swagger UI gerado automaticamente.
+
+### Painel de gestor (`/admin`)
+
+Dashboard de uso e qualidade — perguntas por dia, usuários mais ativos,
+taxa de recusa, alertas de guardrail (PII/injection) e uma heurística de
+possível alucinação (segunda chamada de LLM perguntando se a resposta se
+sustenta nas fontes recuperadas — não é detecção garantida, é sinal pra
+revisão humana).
+
+Protegido por token temporário (`CVIA_ADMIN_TOKEN` no `.env`) até existir
+autenticação de verdade via API do Freshdesk — nesse ponto, `usuario_id`/
+`usuario_email` (hoje `null`, preenchidos automaticamente pelo backend)
+substituem a sessão anônima em todo o painel sem mudar o resto do schema.
+Sem o token configurado, `/admin/api/*` responde 403 e o painel fica
+desabilitado.
+
+Todo log de interação é *best-effort*: se o `DATABASE_URL` não estiver
+configurado ou a escrita falhar, o assistente responde normalmente — só o
+registro no painel é que fica de fora.
 
 ### Banco online (Postgres/pgvector via Supabase)
 

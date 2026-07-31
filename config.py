@@ -66,3 +66,17 @@ TOP_K = int(os.getenv("CVIA_TOP_K", "4"))
 # Ajuste conforme o provedor de embeddings (mock/local/openai tem escalas
 # diferentes). Abaixo disso o assistente responde que nao encontrou na base.
 LIMIAR_GROUNDING = float(os.getenv("CVIA_LIMIAR_GROUNDING", "0.18"))
+# Acima do limiar de grounding mas abaixo deste, a resposta e sinalizada no
+# painel como "grounding fraco" (risco maior de a LLM ter completado com
+# conhecimento proprio em vez de so a fonte) — heuristica, nao deteccao real.
+LIMIAR_CONFIANCA = float(os.getenv("CVIA_LIMIAR_CONFIANCA", "0.35"))
+
+# --- Painel de gestor / observabilidade --------------------------------------
+# Token temporario para proteger /admin ate a autenticacao via API do
+# Freshdesk existir. Gere um valor forte e configure via env — nunca deixe o
+# padrao em producao (fica vazio = painel desabilitado).
+ADMIN_TOKEN = os.getenv("CVIA_ADMIN_TOKEN", "")
+# Roda uma segunda chamada de LLM (barata, max_tokens baixo) apos cada
+# resposta nao recusada, perguntando se a resposta se sustenta nas fontes.
+# Desliga se quiser cortar custo/latencia.
+VERIFICAR_FIDELIDADE = os.getenv("CVIA_VERIFICAR_FIDELIDADE", "true").lower() != "false"

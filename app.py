@@ -1,5 +1,6 @@
 """API web do CVIA — expoe o mesmo pipeline do cvia.cli por HTTP, para deploy
-online (Docker/Render/Railway/etc). Nao substitui o CLI, so adiciona uma
+online (Docker/Render/Railway/Vercel/etc), mais um painel de gestor (uso,
+qualidade, guardrails) em /admin. Nao substitui o CLI, so adiciona uma
 interface HTTP em cima dele.
 
 Uso local:  uvicorn app:app --reload
@@ -8,6 +9,8 @@ Producao:   uvicorn app:app --host 0.0.0.0 --port $PORT
 from __future__ import annotations
 
 import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
 
 for _stream in (sys.stdout, sys.stderr):
@@ -34,7 +37,7 @@ def _carregar_env() -> None:
 _carregar_env()
 
 import config  # noqa: E402
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI, Header, HTTPException, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
@@ -42,8 +45,10 @@ from pydantic import BaseModel  # noqa: E402
 
 from cvia.ia.fabrica_embeddings import criar_embeddings  # noqa: E402
 from cvia.ia.fabrica_llm import criar_llm  # noqa: E402
-from cvia.rag.assistente import Dependencias, responder  # noqa: E402
+from cvia.rag.assistente import Dependencias, montar_contexto, responder  # noqa: E402
 from cvia.rag.fabrica_repositorio import criar_repositorio  # noqa: E402
+from cvia.rag.interacoes import RegistradorInteracoes  # noqa: E402
+from cvia.rag.verificador import verificar_fidelidade  # noqa: E402
 
 app = FastAPI(title="CVIA", description="Assistente RAG da base de conhecimento do CV CRM")
 
@@ -56,6 +61,7 @@ app.add_middleware(
 )
 
 _dep: Dependencias | None = None
+_registrador: RegistradorInteracoes | None = None
 
 
 def _dependencias() -> Dependencias:
@@ -66,9 +72,24 @@ def _dependencias() -> Dependencias:
     return _dep
 
 
+def _log() -> RegistradorInteracoes:
+    global _registrador
+    if _registrador is None:
+        _registrador = RegistradorInteracoes()
+    return _registrador
+
+
+def _exigir_admin(x_admin_token: str | None = Header(default=None)) -> None:
+    if not config.ADMIN_TOKEN:
+        raise HTTPException(403, "Painel admin desabilitado (CVIA_ADMIN_TOKEN nao configurado).")
+    if not x_admin_token or x_admin_token != config.ADMIN_TOKEN:
+        raise HTTPException(401, "Token invalido.")
+
+
 class PerguntaEntrada(BaseModel):
     pergunta: str
     historico: list[tuple[str, str]] | None = None
+    sessao_id: str | None = None
 
 
 class FonteSaida(BaseModel):
@@ -93,6 +114,7 @@ def health() -> dict:
         "indice_total": repo.total,
         "embedding_provedor": config.EMBEDDING_PROVEDOR,
         "llm_provedor": config.LLM_PROVEDOR,
+        "logs_ativos": _log().ativo,
     }
 
 
@@ -101,8 +123,18 @@ def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
     dep = _dependencias()
     if dep.repositorio.total == 0:
         raise HTTPException(503, "Indice vazio. Rode a extracao e ingestao antes de perguntar.")
+
+    inicio = time.perf_counter()
     resultado = responder(entrada.pergunta, dep, entrada.historico)
-    fontes = [
+    duracao_ms = int((time.perf_counter() - inicio) * 1000)
+
+    fiel: bool | None = None
+    fiel_motivo = ""
+    if not resultado.recusado:
+        contexto = montar_contexto(resultado.fontes)
+        fiel, fiel_motivo = verificar_fidelidade(resultado.resposta, contexto, dep.llm)
+
+    fontes_saida = [
         FonteSaida(
             titulo=f.metadados.get("titulo", ""),
             url=f.metadados.get("url", ""),
@@ -110,13 +142,87 @@ def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
         )
         for f in (resultado.fontes if not resultado.recusado else [])
     ]
+
+    try:
+        _log().registrar(
+            sessao_id=entrada.sessao_id,
+            pergunta=entrada.pergunta,
+            resposta=resultado.resposta,
+            recusado=resultado.recusado,
+            melhor_score=resultado.melhor_score,
+            modelo=resultado.modelo,
+            guardrail_entrada=[asdict(e) for e in resultado.eventos_entrada],
+            guardrail_saida=[asdict(e) for e in resultado.eventos_saida],
+            fontes=[f.model_dump() for f in fontes_saida],
+            fiel=fiel,
+            fiel_motivo=fiel_motivo,
+            duracao_ms=duracao_ms,
+        )
+    except Exception as e:  # noqa — log nunca pode derrubar a resposta
+        print(f"[perguntar] falha ao registrar interacao (ignorado): {e}")
+
     return RespostaSaida(
         resposta=resultado.resposta,
         recusado=resultado.recusado,
         melhor_score=resultado.melhor_score,
         modelo=resultado.modelo,
-        fontes=fontes,
+        fontes=fontes_saida,
     )
+
+
+# --- Painel de gestor (admin) ------------------------------------------------
+
+@app.get("/admin/api/resumo")
+def admin_resumo(dias: int = Query(30, ge=1, le=365), x_admin_token: str | None = Header(default=None)) -> dict:
+    _exigir_admin(x_admin_token)
+    reg = _log()
+    if not reg.ativo:
+        raise HTTPException(503, "Log de interacoes desativado (DATABASE_URL nao configurado).")
+    return reg.resumo(dias=dias)
+
+
+@app.get("/admin/api/serie-diaria")
+def admin_serie_diaria(dias: int = Query(30, ge=1, le=365), x_admin_token: str | None = Header(default=None)) -> list[dict]:
+    _exigir_admin(x_admin_token)
+    reg = _log()
+    if not reg.ativo:
+        raise HTTPException(503, "Log de interacoes desativado.")
+    return reg.serie_diaria(dias=dias)
+
+
+@app.get("/admin/api/usuarios")
+def admin_usuarios(
+    dias: int = Query(30, ge=1, le=365),
+    limite: int = Query(10, ge=1, le=100),
+    x_admin_token: str | None = Header(default=None),
+) -> list[dict]:
+    _exigir_admin(x_admin_token)
+    reg = _log()
+    if not reg.ativo:
+        raise HTTPException(503, "Log de interacoes desativado.")
+    return reg.top_usuarios(limite=limite, dias=dias)
+
+
+@app.get("/admin/api/interacoes")
+def admin_interacoes(
+    limite: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    so_recusadas: bool = Query(False),
+    so_guardrail: bool = Query(False),
+    so_suspeita: bool = Query(False),
+    busca: str | None = Query(None),
+    x_admin_token: str | None = Header(default=None),
+) -> dict:
+    _exigir_admin(x_admin_token)
+    reg = _log()
+    if not reg.ativo:
+        raise HTTPException(503, "Log de interacoes desativado.")
+    linhas, total = reg.listar(
+        limite=limite, offset=offset,
+        so_recusadas=so_recusadas, so_guardrail=so_guardrail, so_suspeita=so_suspeita,
+        busca=busca,
+    )
+    return {"total": total, "itens": linhas}
 
 
 _DIR_STATIC = Path(__file__).resolve().parent / "static"
@@ -127,6 +233,11 @@ def pagina_inicial() -> FileResponse:
     return FileResponse(_DIR_STATIC / "index.html")
 
 
+@app.get("/admin")
+def pagina_admin() -> FileResponse:
+    return FileResponse(_DIR_STATIC / "admin.html")
+
+
 @app.get("/api")
 def info_api() -> dict:
     return {
@@ -134,6 +245,7 @@ def info_api() -> dict:
         "docs": "/docs",
         "saude": "/health",
         "pergunta": "POST /perguntar {\"pergunta\": \"...\"}",
+        "admin": "/admin (requer token)",
     }
 
 
