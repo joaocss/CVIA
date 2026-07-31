@@ -1,0 +1,13 @@
+# Nucleo (obrigatorio) — roda o RAG offline com embeddings mock
+numpy>=1.24
+
+# Extracao da base (crawler Freshdesk)
+requests>=2.31
+beautifulsoup4>=4.12
+lxml>=5.0
+
+# Provedor de embeddings local, offline apos baixar o modelo (opcional)
+# sentence-transformers>=3.0
+
+# Provedor OpenAI (embeddings + LLM), requer OPENAI_API_KEY
+openai>=1.40

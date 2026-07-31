@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.env
+dados/indice/
+dados/bruto/
+dados/artigos.jsonl
+.venv/
+.claude/
+*.log
+extracao_log.txt
+
+# Scripts avulsos/exploratorios anteriores ao pipeline atual (cvia/), nao
+# fazem parte do projeto mantido.
+cvcrm-rag/
+importcvb.py
+test_chunk.py
+test_rag.py
+
+# Documentos locais com dados de cliente (PII) ou que descrevem falha nao
+# corrigida da API em producao: usados so localmente para o RAG, nunca vao
+# para o repo publico.
+cvia/extracao/extradoc/Explicacao_Suporte_Clicksign_Reserva1597.md
+cvia/extracao/extradoc/Resumo_Suporte_Clicksign_Reserva1597.md
+cvia/extracao/extradoc/origemcv_leads.md
+cvia/extracao/extradoc/erp-uau-v2.skill
