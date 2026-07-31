@@ -10,6 +10,10 @@ dados/artigos.jsonl
 *_log.txt
 supabase/
 
+# Documentos pessoais/de trabalho soltos na pasta, nao sao parte do projeto.
+*.docx
+~$*
+
 # Scripts avulsos/exploratorios anteriores ao pipeline atual (cvia/), nao
 # fazem parte do projeto mantido.
 cvcrm-rag/
