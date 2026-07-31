@@ -1,12 +1,17 @@
 #!/bin/sh
-# Se o indice vetorial nao existir ainda (primeiro deploy / volume vazio),
+# Se o indice estiver vazio (primeiro deploy / volume vazio / banco novo),
 # roda extracao + ingestao antes de subir o servidor. Leva alguns minutos
-# na primeira vez; deploys seguintes (com volume persistente) pulam direto
-# pro uvicorn.
+# na primeira vez. Funciona tanto com CVIA_REPOSITORIO=local (arquivo) quanto
+# =postgres (Supabase/pgvector) — a checagem e feita pelo proprio pipeline.
 set -e
 
-if [ ! -f "dados/indice/vetores.npy" ]; then
-  echo "[entrypoint] indice nao encontrado, rodando extracao + ingestao..."
+INDICE_VAZIO=$(python -c "
+from cvia.rag.fabrica_repositorio import criar_repositorio
+print('vazio' if criar_repositorio().carregar().total == 0 else 'ok')
+")
+
+if [ "$INDICE_VAZIO" = "vazio" ]; then
+  echo "[entrypoint] indice vazio, rodando extracao + ingestao..."
   python -m cvia.cli extrair
   python -m cvia.cli ingerir
 else

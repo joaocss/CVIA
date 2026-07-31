@@ -51,6 +51,13 @@ MODELO_EMBEDDING_LOCAL = os.getenv(
 MODELO_LLM_OPENAI = os.getenv("CVIA_MODELO_LLM_OPENAI", "gpt-4o-mini")
 DIMENSAO_MOCK = int(os.getenv("CVIA_DIMENSAO_MOCK", "512"))
 
+# --- Repositorio de trechos (vector store) -----------------------------------
+#   CVIA_REPOSITORIO = local (padrao, arquivo numpy) | postgres (Supabase/pgvector)
+# So faz sentido usar "postgres" com embeddings=openai (dimensao fixa 1536 na
+# tabela). DATABASE_URL vem do .env (nunca commitar valor real).
+REPOSITORIO_PROVEDOR = os.getenv("CVIA_REPOSITORIO", "local").lower()
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
 # --- Parametros do RAG ------------------------------------------------------
 CHUNK_TAMANHO_ALVO = int(os.getenv("CVIA_CHUNK_TAMANHO", "900"))
 CHUNK_SOBREPOSICAO = int(os.getenv("CVIA_CHUNK_SOBREPOSICAO", "150"))

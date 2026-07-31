@@ -52,7 +52,7 @@ from .ia.fabrica_llm import criar_llm
 from .ia.tipos import Artigo
 from .rag.assistente import Dependencias, responder
 from .rag.ingestao import ingerir
-from .rag.repositorio import RepositorioLocal
+from .rag.fabrica_repositorio import criar_repositorio
 
 
 def carregar_artigos(arquivo: Path) -> list[Artigo]:
@@ -89,16 +89,17 @@ def cmd_ingerir(args) -> None:
         sys.exit(f"Arquivo nao encontrado: {arquivo}. Rode 'extrair' antes ou aponte a amostra.")
     artigos = carregar_artigos(arquivo)
     embeddings = criar_embeddings()
-    repo = RepositorioLocal()
+    repo = criar_repositorio()
     repo.limpar()
     total = ingerir(artigos, embeddings, repo)
     repo.salvar()
+    destino = getattr(repo, "dir_indice", None) or f"postgres ({config.REPOSITORIO_PROVEDOR})"
     print(f"Ingeridos {total} trechos de {len(artigos)} artigos "
-          f"(embeddings={embeddings.nome}) -> {repo.dir_indice}")
+          f"(embeddings={embeddings.nome}) -> {destino}")
 
 
 def _dependencias() -> Dependencias:
-    repo = RepositorioLocal().carregar()
+    repo = criar_repositorio().carregar()
     if repo.total == 0:
         sys.exit("Indice vazio. Rode 'python -m cvia.cli ingerir' antes.")
     return Dependencias(embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo)
@@ -144,9 +145,11 @@ def cmd_chat(args) -> None:
 
 
 def cmd_info(args) -> None:
-    repo = RepositorioLocal().carregar()
+    repo = criar_repositorio().carregar()
+    destino = getattr(repo, "dir_indice", None) or f"postgres ({config.REPOSITORIO_PROVEDOR})"
     print(f"Embedding: {config.EMBEDDING_PROVEDOR} | LLM: {config.LLM_PROVEDOR}")
-    print(f"Indice: {repo.total} trechos em {repo.dir_indice}")
+    print(f"Repositorio: {config.REPOSITORIO_PROVEDOR}")
+    print(f"Indice: {repo.total} trechos em {destino}")
     print(f"Limiar de grounding: {config.LIMIAR_GROUNDING} | TOP_K: {config.TOP_K}")
 
 

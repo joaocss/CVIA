@@ -15,3 +15,6 @@ openai>=1.40
 # Servidor web (deploy online)
 fastapi>=0.110
 uvicorn[standard]>=0.29
+
+# Repositorio Postgres/pgvector (opcional, CVIA_REPOSITORIO=postgres)
+psycopg2-binary>=2.9

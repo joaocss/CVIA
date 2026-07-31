@@ -72,18 +72,40 @@ CVIA_EMBEDDING_PROVEDOR=local CVIA_LLM_PROVEDOR=openai python -m cvia.cli pergun
 > Ao trocar o provedor de embeddings, **reingira** a base (os vetores mudam de
 > escala/dimensão) e reavalie `CVIA_LIMIAR_GROUNDING`.
 
-## Rodando como API (deploy online)
+## Rodando como API + chat web (deploy online)
 
-`app.py` expõe o mesmo pipeline do CLI por HTTP (FastAPI):
+`app.py` expõe o mesmo pipeline do CLI por HTTP (FastAPI) e serve uma
+interface de chat (`static/index.html`) para testar visualmente, com as
+cores/identidade do CV CRM (navy `#12344D` + verde `#00B389`):
 
 ```bash
-pip install -r requirements.txt   # inclui fastapi + uvicorn
-uvicorn app:app --reload          # http://127.0.0.1:8000
+pip install -r requirements.txt   # inclui fastapi + uvicorn + psycopg2-binary
+uvicorn app:app --reload          # http://127.0.0.1:8000 → chat web
 ```
 
+- `GET /` — interface de chat (HTML/CSS/JS puro, sem build step).
 - `GET /health` — status do índice e provedores configurados.
-- `POST /perguntar {"pergunta": "..."}` — mesma resposta do `cli.py perguntar`, em JSON.
+- `POST /perguntar {"pergunta": "...", "historico": [...]}` — mesma resposta do `cli.py perguntar`, em JSON.
 - `GET /docs` — Swagger UI gerado automaticamente.
+
+### Banco online (Postgres/pgvector via Supabase)
+
+Por padrão o índice fica em `dados/indice/` (arquivo local). Para usar um
+banco online (persistente entre deploys, necessário se for hospedar em algo
+sem disco persistente):
+
+```bash
+# .env
+CVIA_REPOSITORIO=postgres
+DATABASE_URL=postgresql://usuario:senha@host:5432/postgres
+```
+
+`cvia/rag/repositorio_postgres.py` implementa a mesma interface do
+repositório local (cria a extensão `vector`, a tabela e o índice HNSW
+automaticamente na primeira conexão). Só faz sentido com embeddings OpenAI
+(dimensão fixa 1536 na tabela — trocar de provedor de embeddings exige
+recriar a tabela). Depois de configurar, rode `python -m cvia.cli ingerir`
+normalmente — ele detecta o repositório pela env var.
 
 ### Deploy com Docker
 

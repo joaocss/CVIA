@@ -36,12 +36,14 @@ _carregar_env()
 import config  # noqa: E402
 from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
 from cvia.ia.fabrica_embeddings import criar_embeddings  # noqa: E402
 from cvia.ia.fabrica_llm import criar_llm  # noqa: E402
 from cvia.rag.assistente import Dependencias, responder  # noqa: E402
-from cvia.rag.repositorio import RepositorioLocal  # noqa: E402
+from cvia.rag.fabrica_repositorio import criar_repositorio  # noqa: E402
 
 app = FastAPI(title="CVIA", description="Assistente RAG da base de conhecimento do CV CRM")
 
@@ -59,7 +61,7 @@ _dep: Dependencias | None = None
 def _dependencias() -> Dependencias:
     global _dep
     if _dep is None:
-        repo = RepositorioLocal().carregar()
+        repo = criar_repositorio().carregar()
         _dep = Dependencias(embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo)
     return _dep
 
@@ -85,7 +87,7 @@ class RespostaSaida(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    repo = RepositorioLocal().carregar()
+    repo = criar_repositorio().carregar()
     return {
         "status": "ok" if repo.total > 0 else "indice_vazio",
         "indice_total": repo.total,
@@ -117,11 +119,23 @@ def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
     )
 
 
+_DIR_STATIC = Path(__file__).resolve().parent / "static"
+
+
 @app.get("/")
-def pagina_inicial() -> dict:
+def pagina_inicial() -> FileResponse:
+    return FileResponse(_DIR_STATIC / "index.html")
+
+
+@app.get("/api")
+def info_api() -> dict:
     return {
         "servico": "CVIA",
         "docs": "/docs",
         "saude": "/health",
         "pergunta": "POST /perguntar {\"pergunta\": \"...\"}",
     }
+
+
+if _DIR_STATIC.exists():
+    app.mount("/static", StaticFiles(directory=_DIR_STATIC), name="static")
