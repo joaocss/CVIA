@@ -3,8 +3,8 @@ repositorio. Recebe os artigos ja extraidos e limpos (dataclass Artigo)."""
 from __future__ import annotations
 
 from ..ia.tipos import Artigo, ChunkParaInserir, ProvedorEmbeddings, RepositorioTrechos
-from .acervo import AcervoArtigos
 from .chunker import chunkar
+from .fabrica_acervo import criar_acervo
 
 
 def ingerir(
@@ -17,7 +17,7 @@ def ingerir(
     # Acervo: guarda o artigo INTEGRO (texto + imagens) para reapresentacao na
     # consulta. Os chunks abaixo servem so para a busca por similaridade.
     if salvar_acervo:
-        AcervoArtigos().salvar(artigos)
+        criar_acervo().salvar(artigos)
 
     pendentes: list[tuple[Artigo, object]] = []
     for artigo in artigos:

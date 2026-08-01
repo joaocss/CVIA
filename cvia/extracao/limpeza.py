@@ -207,6 +207,7 @@ def extrair_artigo(html: str) -> dict:
     corpo = _elemento_corpo(soup)
     texto = _para_texto(corpo)
 
-    # corta a partir do bloco de feedback, se sobrou
-    texto = re.split(r"este artigo foi util", texto, flags=re.IGNORECASE)[0].strip()
+    # corta a partir do bloco de feedback, se sobrou (widget do Freshdesk nao
+    # e removido pelos seletores porque as classes reais divergem por tema)
+    texto = re.split(r"este artigo foi ?[uú]til", texto, flags=re.IGNORECASE)[0].strip()
     return {"titulo": titulo, "texto": texto, "autor": autor, "atualizado_em": ""}

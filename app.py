@@ -45,8 +45,8 @@ from pydantic import BaseModel  # noqa: E402
 
 from cvia.ia.fabrica_embeddings import criar_embeddings  # noqa: E402
 from cvia.ia.fabrica_llm import criar_llm  # noqa: E402
-from cvia.rag.acervo import AcervoArtigos  # noqa: E402
 from cvia.rag.assistente import Dependencias, montar_contexto, responder  # noqa: E402
+from cvia.rag.fabrica_acervo import criar_acervo  # noqa: E402
 from cvia.rag.fabrica_repositorio import criar_repositorio  # noqa: E402
 from cvia.rag.interacoes import RegistradorInteracoes  # noqa: E402
 from cvia.rag.verificador import verificar_fidelidade  # noqa: E402
@@ -69,7 +69,7 @@ def _dependencias() -> Dependencias:
     global _dep
     if _dep is None:
         repo = criar_repositorio().carregar()
-        acervo = AcervoArtigos().carregar()
+        acervo = criar_acervo().carregar()
         _dep = Dependencias(
             embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo, acervo=acervo,
         )

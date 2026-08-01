@@ -50,8 +50,8 @@ import config
 from .ia.fabrica_embeddings import criar_embeddings
 from .ia.fabrica_llm import criar_llm
 from .ia.tipos import Artigo
-from .rag.acervo import AcervoArtigos
 from .rag.assistente import Dependencias, responder
+from .rag.fabrica_acervo import criar_acervo
 from .rag.ingestao import ingerir
 from .rag.fabrica_repositorio import criar_repositorio
 
@@ -103,7 +103,7 @@ def _dependencias() -> Dependencias:
     repo = criar_repositorio().carregar()
     if repo.total == 0:
         sys.exit("Indice vazio. Rode 'python -m cvia.cli ingerir' antes.")
-    acervo = AcervoArtigos().carregar()
+    acervo = criar_acervo().carregar()
     return Dependencias(
         embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo, acervo=acervo,
     )
