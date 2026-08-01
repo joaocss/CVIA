@@ -45,6 +45,7 @@ from pydantic import BaseModel  # noqa: E402
 
 from cvia.ia.fabrica_embeddings import criar_embeddings  # noqa: E402
 from cvia.ia.fabrica_llm import criar_llm  # noqa: E402
+from cvia.rag.acervo import AcervoArtigos  # noqa: E402
 from cvia.rag.assistente import Dependencias, montar_contexto, responder  # noqa: E402
 from cvia.rag.fabrica_repositorio import criar_repositorio  # noqa: E402
 from cvia.rag.interacoes import RegistradorInteracoes  # noqa: E402
@@ -68,7 +69,10 @@ def _dependencias() -> Dependencias:
     global _dep
     if _dep is None:
         repo = criar_repositorio().carregar()
-        _dep = Dependencias(embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo)
+        acervo = AcervoArtigos().carregar()
+        _dep = Dependencias(
+            embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo, acervo=acervo,
+        )
     return _dep
 
 
@@ -98,12 +102,22 @@ class FonteSaida(BaseModel):
     score: float
 
 
+class ArtigoSaida(BaseModel):
+    titulo: str
+    url: str
+    texto: str
+    categoria: str = ""
+    pasta: str = ""
+    score: float = 0.0
+
+
 class RespostaSaida(BaseModel):
     resposta: str
     recusado: bool
     melhor_score: float
     modelo: str | None
     fontes: list[FonteSaida]
+    artigos: list[ArtigoSaida] = []
 
 
 class RetomarSaida(BaseModel):
@@ -168,12 +182,25 @@ def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
     except Exception as e:  # noqa — log nunca pode derrubar a resposta
         print(f"[perguntar] falha ao registrar interacao (ignorado): {e}")
 
+    artigos_saida = [
+        ArtigoSaida(
+            titulo=a.titulo,
+            url=a.url,
+            texto=a.texto,
+            categoria=a.categoria,
+            pasta=a.pasta,
+            score=round(a.score, 3),
+        )
+        for a in (resultado.artigos if not resultado.recusado else [])
+    ]
+
     return RespostaSaida(
         resposta=resultado.resposta,
         recusado=resultado.recusado,
         melhor_score=resultado.melhor_score,
         modelo=resultado.modelo,
         fontes=fontes_saida,
+        artigos=artigos_saida,
     )
 
 

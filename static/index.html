@@ -154,6 +154,45 @@
     background: var(--teal-light); color: var(--teal-dark);
     padding: 1px 5px; border-radius: 4px; font-size: 12.5px;
   }
+  .bolha h2, .bolha h3, .artigo-corpo h2, .artigo-corpo h3 {
+    margin: 12px 0 6px; line-height: 1.3; color: var(--navy);
+  }
+  .bolha h2, .artigo-corpo h2 { font-size: 15px; }
+  .bolha h3, .artigo-corpo h3 { font-size: 13.5px; }
+  .bolha img, .artigo-corpo img {
+    max-width: 100%; height: auto; display: block; margin: 8px 0;
+    border: 1px solid var(--card-border); border-radius: 8px;
+  }
+  .bolha pre, .artigo-corpo pre {
+    background: var(--navy-dark); color: #e6f6f2; padding: 10px 12px;
+    border-radius: 8px; overflow-x: auto; font-size: 12.5px; margin: 8px 0;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .artigo-corpo ol { list-style: decimal; }
+
+  /* Artigo apresentado na integra (texto + prints), abaixo da resposta */
+  .artigo-integro {
+    margin-top: 12px; border: 1px solid var(--card-border);
+    border-radius: 12px; overflow: hidden; background: #fff;
+  }
+  .artigo-integro > summary {
+    cursor: pointer; list-style: none; padding: 10px 14px;
+    background: var(--teal-light); color: var(--navy);
+    font-weight: 600; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .artigo-integro > summary::-webkit-details-marker { display: none; }
+  .artigo-integro > summary .selo {
+    font-size: 10.5px; font-weight: 600; color: var(--teal-dark);
+    background: #fff; border: 1px solid var(--teal); border-radius: 999px;
+    padding: 1px 8px; margin-left: auto; white-space: nowrap;
+  }
+  .artigo-corpo {
+    padding: 4px 16px 14px; font-size: 13.5px; line-height: 1.6; color: #26333d;
+  }
+  .artigo-corpo p { margin: 0 0 8px; }
+  .artigo-corpo a { color: var(--teal-dark); }
+  .artigo-corpo strong { color: var(--navy); }
 
   .fontes {
     margin-top: 10px;
@@ -385,26 +424,69 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// markdown bem simples: **negrito**, listas com "- ", quebras de linha, links [t](u)
+// markdown: cabecalhos (##/###), imagens ![alt](url), links [t](u), listas
+// ordenadas (1.) e nao ordenadas (-) com aninhamento por indentacao, blocos de
+// codigo (```), **negrito** e `codigo`. Suporta o artigo integro multimodal.
+function inlineMd(s) {
+  s = escapeHtml(s);
+  s = s.replace(/!\[([^\]]*)\]\((https?:[^\s)]+)\)/g,
+    '<img src="$2" alt="$1" loading="lazy">');
+  s = s.replace(/\[([^\]]+)\]\((https?:[^\s)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  return s;
+}
+
 function renderMarkdown(texto) {
-  const linhas = texto.split('\n');
+  const linhas = String(texto || '').split('\n');
   let html = '';
-  let emLista = false;
-  for (const linhaRaw of linhas) {
-    let linha = escapeHtml(linhaRaw);
-    linha = linha.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    linha = linha.replace(/`(.+?)`/g, '<code>$1</code>');
-    linha = linha.replace(/\[([^\]]+)\]\((https?:[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-    const itemLista = linha.match(/^\s*[-*]\s+(.*)/) || linha.match(/^\s*\d+\.\s+(.*)/);
-    if (itemLista) {
-      if (!emLista) { html += '<ul>'; emLista = true; }
-      html += `<li>${itemLista[1]}</li>`;
-    } else {
-      if (emLista) { html += '</ul>'; emLista = false; }
-      if (linha.trim()) html += `<p>${linha}</p>`;
+  const pilha = [];          // listas abertas: {tag, indent}
+  let emCode = false;
+  let bufCode = [];
+
+  const fecharTudo = () => { while (pilha.length) html += `</${pilha.pop().tag}>`; };
+  const fecharMaisProfundas = (indent) => {
+    while (pilha.length && pilha[pilha.length - 1].indent > indent) {
+      html += `</${pilha.pop().tag}>`;
     }
+  };
+
+  for (const raw of linhas) {
+    if (raw.trim() === '```') {
+      if (emCode) { html += `<pre>${escapeHtml(bufCode.join('\n'))}</pre>`; bufCode = []; emCode = false; }
+      else { fecharTudo(); emCode = true; }
+      continue;
+    }
+    if (emCode) { bufCode.push(raw); continue; }
+    if (!raw.trim()) continue;
+
+    const mH = raw.match(/^(#{2,3})\s+(.*)$/);
+    if (mH) { fecharTudo(); const n = mH[1].length; html += `<h${n}>${inlineMd(mH[2])}</h${n}>`; continue; }
+
+    const mLi = raw.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+    if (mLi) {
+      const indent = mLi[1].length;
+      const tag = /\d+\./.test(mLi[2]) ? 'ol' : 'ul';
+      fecharMaisProfundas(indent);
+      const topo = pilha[pilha.length - 1];
+      if (!topo || topo.indent < indent) {
+        html += `<${tag}>`; pilha.push({ tag, indent });
+      } else if (topo.indent === indent && topo.tag !== tag) {
+        html += `</${topo.tag}>`; pilha.pop();
+        html += `<${tag}>`; pilha.push({ tag, indent });
+      }
+      html += `<li>${inlineMd(mLi[3])}</li>`;
+      continue;
+    }
+
+    fecharTudo();
+    const conteudo = inlineMd(raw);
+    if (/^\s*<img[^>]*>\s*$/.test(conteudo)) html += conteudo;
+    else html += `<p>${conteudo}</p>`;
   }
-  if (emLista) html += '</ul>';
+  if (emCode && bufCode.length) html += `<pre>${escapeHtml(bufCode.join('\n'))}</pre>`;
+  fecharTudo();
   return html || '<p></p>';
 }
 
@@ -460,6 +542,29 @@ async function perguntar(pergunta) {
     const d = await r.json();
     const { div, bolha } = adicionarMensagem('assistente', d.resposta);
     if (d.recusado) div.classList.add('recusado');
+
+    // Artigo(s) na integra — texto + prints — logo abaixo da resposta didatica.
+    if (d.artigos && d.artigos.length) {
+      for (const a of d.artigos) {
+        const det = document.createElement('details');
+        det.className = 'artigo-integro';
+        det.open = true;
+        const sum = document.createElement('summary');
+        sum.innerHTML = `<span>Artigo completo: ${escapeHtml(a.titulo)}</span>`
+          + `<span class="selo">passo a passo</span>`;
+        const corpo = document.createElement('div');
+        corpo.className = 'artigo-corpo';
+        corpo.innerHTML = renderMarkdown(a.texto);
+        if (a.url) {
+          const rodape = document.createElement('p');
+          rodape.innerHTML = `<a href="${a.url}" target="_blank" rel="noopener">Abrir o artigo no portal</a>`;
+          corpo.appendChild(rodape);
+        }
+        det.appendChild(sum);
+        det.appendChild(corpo);
+        bolha.appendChild(det);
+      }
+    }
 
     if (d.fontes && d.fontes.length) {
       const wrap = document.createElement('div');

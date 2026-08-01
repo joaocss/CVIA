@@ -50,6 +50,7 @@ import config
 from .ia.fabrica_embeddings import criar_embeddings
 from .ia.fabrica_llm import criar_llm
 from .ia.tipos import Artigo
+from .rag.acervo import AcervoArtigos
 from .rag.assistente import Dependencias, responder
 from .rag.ingestao import ingerir
 from .rag.fabrica_repositorio import criar_repositorio
@@ -102,11 +103,20 @@ def _dependencias() -> Dependencias:
     repo = criar_repositorio().carregar()
     if repo.total == 0:
         sys.exit("Indice vazio. Rode 'python -m cvia.cli ingerir' antes.")
-    return Dependencias(embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo)
+    acervo = AcervoArtigos().carregar()
+    return Dependencias(
+        embeddings=criar_embeddings(), llm=criar_llm(), repositorio=repo, acervo=acervo,
+    )
 
 
 def _mostrar(resultado) -> None:
     print("\n" + resultado.resposta + "\n")
+    if getattr(resultado, "artigos", None) and not resultado.recusado:
+        for a in resultado.artigos:
+            print("=" * 70)
+            print(f"ARTIGO NA INTEGRA: {a.titulo}  ({a.url})")
+            print("=" * 70)
+            print(a.texto + "\n")
     if resultado.fontes and not resultado.recusado:
         print("Fontes:")
         vistos = set()

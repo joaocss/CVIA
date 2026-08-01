@@ -54,6 +54,19 @@ class TrechoRecuperado:
     score: float
 
 
+@dataclass
+class ArtigoIntegral:
+    """Artigo completo (markdown com imagens inline) resolvido a partir do
+    chunk recuperado, para reapresentacao na integra na resposta."""
+    artigo_id: str
+    titulo: str
+    texto: str
+    url: str
+    categoria: str = ""
+    pasta: str = ""
+    score: float = 0.0
+
+
 @runtime_checkable
 class RepositorioTrechos(Protocol):
     def inserir(self, chunks: list[ChunkParaInserir]) -> None:

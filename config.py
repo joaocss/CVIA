@@ -13,6 +13,7 @@ DIR_DADOS = RAIZ / "dados"
 DIR_BRUTO = DIR_DADOS / "bruto"                      # HTML/artigos crus do crawler
 DIR_INDICE = DIR_DADOS / "indice"                    # vetores persistidos
 ARQUIVO_ARTIGOS = DIR_DADOS / "artigos.jsonl"        # base completa (gerada pela extracao)
+ARQUIVO_ACERVO = DIR_INDICE / "artigos.jsonl"        # artigos INTEGROS (texto+imagens) p/ reapresentacao
 ARQUIVO_AMOSTRA = DIR_DADOS / "artigos_amostra.jsonl"  # amostra real versionada no repo
 
 # --- Base de ajuda (Freshdesk) ----------------------------------------------
