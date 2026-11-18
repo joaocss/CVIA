@@ -19,7 +19,9 @@ RAIZ_EXTRACAO = Path(__file__).resolve().parent
 
 ARQUIVOS_LOCAIS: list[tuple[str, str]] = [
     ("extradoc/trecho_skill_erp-sienge_baseDateInterest.md", "Integracao Sienge"),
-    ("extradoc/origemcv_leads.md", "API de Leads"),
+    # extradoc/origemcv_leads.md saiu da allowlist: contem dado de cliente e
+    # descreve falha nao corrigida da API em producao (ver .gitignore). So
+    # volta se houver versao sanitizada em extradoc_limpo/.
     ("extradoc_limpo/clicksign_edicao_manual_signatario.md", "Integracao Clicksign"),
 ]
 

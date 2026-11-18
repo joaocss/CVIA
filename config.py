@@ -81,3 +81,14 @@ ADMIN_TOKEN = os.getenv("CVIA_ADMIN_TOKEN", "")
 # resposta nao recusada, perguntando se a resposta se sustenta nas fontes.
 # Desliga se quiser cortar custo/latencia.
 VERIFICAR_FIDELIDADE = os.getenv("CVIA_VERIFICAR_FIDELIDADE", "true").lower() != "false"
+
+# --- Protecao do endpoint publico /perguntar -------------------------------
+# Limites de tamanho: cada pergunta vira chamadas pagas ao LLM, entao a entrada
+# precisa de teto (pergunta, numero de turnos e tamanho de cada turno).
+LIMITE_PERGUNTA_CARACTERES = int(os.getenv("CVIA_LIMITE_PERGUNTA_CARACTERES", "2000"))
+LIMITE_HISTORICO_ITENS = int(os.getenv("CVIA_LIMITE_HISTORICO_ITENS", "10"))
+LIMITE_HISTORICO_CARACTERES = int(os.getenv("CVIA_LIMITE_HISTORICO_CARACTERES", "8000"))
+# Rate limit por IP (janela deslizante de 60s). 0 desliga. E em memoria, por
+# instancia: em serverless cada instancia conta separado, entao e uma barreira
+# best-effort contra abuso, nao um limite global exato.
+LIMITE_REQUISICOES_POR_MINUTO = int(os.getenv("CVIA_LIMITE_REQUISICOES_POR_MINUTO", "10"))

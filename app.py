@@ -8,8 +8,11 @@ Producao:   uvicorn app:app --host 0.0.0.0 --port $PORT
 """
 from __future__ import annotations
 
+import secrets
 import sys
+import threading
 import time
+from collections import deque
 from dataclasses import asdict
 from pathlib import Path
 
@@ -37,11 +40,11 @@ def _carregar_env() -> None:
 _carregar_env()
 
 import config  # noqa: E402
-from fastapi import FastAPI, Header, HTTPException, Query  # noqa: E402
+from fastapi import FastAPI, Header, HTTPException, Query, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel, Field, field_validator  # noqa: E402
 
 from cvia.ia.fabrica_embeddings import criar_embeddings  # noqa: E402
 from cvia.ia.fabrica_llm import criar_llm  # noqa: E402
@@ -86,14 +89,72 @@ def _log() -> RegistradorInteracoes:
 def _exigir_admin(x_admin_token: str | None = Header(default=None)) -> None:
     if not config.ADMIN_TOKEN:
         raise HTTPException(403, "Painel admin desabilitado (CVIA_ADMIN_TOKEN nao configurado).")
-    if not x_admin_token or x_admin_token != config.ADMIN_TOKEN:
+    # compare_digest evita vazar o token por diferenca de tempo de resposta
+    if not x_admin_token or not secrets.compare_digest(
+        x_admin_token.encode("utf-8"), config.ADMIN_TOKEN.encode("utf-8")
+    ):
         raise HTTPException(401, "Token invalido.")
 
 
+class LimitadorRequisicoes:
+    """Rate limit por chave (IP) em janela deslizante, em memoria.
+
+    Best-effort: em serverless cada instancia tem seu proprio contador, entao
+    segura abuso de um cliente so, mas nao e um teto global exato."""
+
+    def __init__(self, limite: int, janela_s: float = 60.0) -> None:
+        self.limite = limite
+        self.janela_s = janela_s
+        self._acessos: dict[str, deque[float]] = {}
+        self._trava = threading.Lock()
+
+    def permitir(self, chave: str) -> bool:
+        if self.limite <= 0:
+            return True
+        agora = time.monotonic()
+        with self._trava:
+            fila = self._acessos.setdefault(chave, deque())
+            while fila and agora - fila[0] > self.janela_s:
+                fila.popleft()
+            if len(fila) >= self.limite:
+                return False
+            fila.append(agora)
+            # evita crescer sem fim com IPs que nao voltam
+            if len(self._acessos) > 10_000:
+                for k in [k for k, f in self._acessos.items() if not f or agora - f[-1] > self.janela_s]:
+                    del self._acessos[k]
+            return True
+
+
+_limitador = LimitadorRequisicoes(config.LIMITE_REQUISICOES_POR_MINUTO)
+
+
+def _ip_cliente(request: Request) -> str:
+    # Atras de proxy (Vercel/Render), o IP real e o primeiro do X-Forwarded-For.
+    encaminhado = request.headers.get("x-forwarded-for", "")
+    if encaminhado:
+        return encaminhado.split(",")[0].strip()
+    return request.client.host if request.client else "desconhecido"
+
+
 class PerguntaEntrada(BaseModel):
-    pergunta: str
-    historico: list[tuple[str, str]] | None = None
-    sessao_id: str | None = None
+    pergunta: str = Field(min_length=1, max_length=config.LIMITE_PERGUNTA_CARACTERES)
+    historico: list[tuple[str, str]] | None = Field(default=None, max_length=config.LIMITE_HISTORICO_ITENS)
+    sessao_id: str | None = Field(default=None, max_length=100)
+
+    @field_validator("historico")
+    @classmethod
+    def _validar_historico(cls, historico: list[tuple[str, str]] | None) -> list[tuple[str, str]] | None:
+        if not historico:
+            return historico
+        for autor, texto in historico:
+            if autor not in ("usuario", "assistente"):
+                raise ValueError("autor do historico deve ser 'usuario' ou 'assistente'")
+            if len(texto) > config.LIMITE_HISTORICO_CARACTERES:
+                raise ValueError(
+                    f"cada item do historico aceita no maximo {config.LIMITE_HISTORICO_CARACTERES} caracteres"
+                )
+        return historico
 
 
 class FonteSaida(BaseModel):
@@ -140,7 +201,9 @@ def health() -> dict:
 
 
 @app.post("/perguntar", response_model=RespostaSaida)
-def perguntar(entrada: PerguntaEntrada) -> RespostaSaida:
+def perguntar(entrada: PerguntaEntrada, request: Request) -> RespostaSaida:
+    if not _limitador.permitir(_ip_cliente(request)):
+        raise HTTPException(429, "Muitas perguntas em pouco tempo. Aguarde um minuto e tente de novo.")
     dep = _dependencias()
     if dep.repositorio.total == 0:
         raise HTTPException(503, "Indice vazio. Rode a extracao e ingestao antes de perguntar.")

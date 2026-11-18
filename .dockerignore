@@ -1,0 +1,28 @@
+# Nada de segredo, dado de cliente ou artefato local dentro da imagem.
+# O .gitignore protege o git, nao o "COPY . ." do Dockerfile.
+.env
+.env.*
+!.env.example
+.git/
+.claude/
+.venv/
+__pycache__/
+*.pyc
+*.log
+*_log.txt
+supabase/
+CVRINO_2.0/
+*.docx
+*.pptx
+~$*
+dados/bruto/
+cvcrm-rag/
+importcvb.py
+test_chunk.py
+test_rag.py
+cvia/extracao/extradoc/Explicacao_Suporte_Clicksign_Reserva1597.md
+cvia/extracao/extradoc/Resumo_Suporte_Clicksign_Reserva1597.md
+cvia/extracao/extradoc/origemcv_leads.md
+cvia/extracao/extradoc/erp-uau-v2.skill
+cvia/extracao/extradoc/teste_brecha_origemcv.py
+cvia/extracao/extradoc/teste_lead_origemcv.py
