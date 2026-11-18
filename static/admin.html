@@ -208,7 +208,9 @@ let TOKEN = sessionStorage.getItem('cvia_admin_token') || '';
 function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
 function fmtNum(n) { return (n ?? 0).toLocaleString('pt-BR'); }
 function escapeHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // escapa tambem aspas: o texto entra em atributos (title="..."), nao so em conteudo
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function fmtData(iso) {
   try {

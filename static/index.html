@@ -298,7 +298,7 @@
   </div>
 
   <form id="composer">
-    <textarea id="campo" rows="1" placeholder="Digite sua pergunta…" autofocus></textarea>
+    <textarea id="campo" rows="1" maxlength="2000" placeholder="Digite sua pergunta…" autofocus></textarea>
     <button id="enviar" type="submit" aria-label="Enviar">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L14 21L11 13L3 12Z" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>
     </button>
@@ -421,7 +421,20 @@ btnNovaConversa.addEventListener('click', () => {
 checarRetomar();
 
 function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // escapa tambem aspas: o texto (resposta do LLM, artigos externos) entra em
+  // atributos como src/alt/href, nao so em conteudo
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// so aceita http(s); qualquer outro esquema (javascript:, data:...) vira '#'
+function urlSegura(url) {
+  try {
+    const u = new URL(String(url ?? ''), window.location.href);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? escapeHtml(u.href) : '#';
+  } catch (e) {
+    return '#';
+  }
 }
 
 // markdown: cabecalhos (##/###), imagens ![alt](url), links [t](u), listas
@@ -536,7 +549,11 @@ async function perguntar(pergunta) {
     removerDigitando();
     if (!r.ok) {
       const detalhe = await r.json().catch(() => ({}));
-      adicionarMensagem('assistente', `Erro ao consultar o assistente: ${detalhe.detail || r.status}`);
+      // 422 traz uma lista de erros de validacao; 429 e o rate limit
+      const texto = Array.isArray(detalhe.detail)
+        ? 'a pergunta ou o histórico passou do tamanho permitido.'
+        : (detalhe.detail || r.status);
+      adicionarMensagem('assistente', `Erro ao consultar o assistente: ${texto}`);
       return;
     }
     const d = await r.json();
@@ -557,7 +574,7 @@ async function perguntar(pergunta) {
         corpo.innerHTML = renderMarkdown(a.texto);
         if (a.url) {
           const rodape = document.createElement('p');
-          rodape.innerHTML = `<a href="${a.url}" target="_blank" rel="noopener">Abrir o artigo no portal</a>`;
+          rodape.innerHTML = `<a href="${urlSegura(a.url)}" target="_blank" rel="noopener noreferrer">Abrir o artigo no portal</a>`;
           corpo.appendChild(rodape);
         }
         det.appendChild(sum);
@@ -576,7 +593,7 @@ async function perguntar(pergunta) {
         vistos.add(chave);
         const item = document.createElement('div');
         item.className = 'fonte-item';
-        item.innerHTML = `<span class="fonte-score">${f.score.toFixed(2)}</span> · <a href="${f.url}" target="_blank" rel="noopener">${escapeHtml(f.titulo)}</a>`;
+        item.innerHTML = `<span class="fonte-score">${f.score.toFixed(2)}</span> · <a href="${urlSegura(f.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(f.titulo)}</a>`;
         wrap.appendChild(item);
       }
       bolha.appendChild(wrap);
@@ -585,7 +602,7 @@ async function perguntar(pergunta) {
     const meta = document.createElement('div');
     meta.className = 'meta-linha';
     const dotClasse = d.melhor_score >= 0.5 ? 'alto' : 'baixo';
-    meta.innerHTML = `<span class="dot ${dotClasse}"></span> score ${d.melhor_score.toFixed(3)}${d.modelo ? ' · ' + d.modelo : ''}`;
+    meta.innerHTML = `<span class="dot ${dotClasse}"></span> score ${d.melhor_score.toFixed(3)}${d.modelo ? ' · ' + escapeHtml(d.modelo) : ''}`;
     bolha.appendChild(meta);
 
     historico.push(['usuario', pergunta]);

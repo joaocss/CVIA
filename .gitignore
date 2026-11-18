@@ -33,3 +33,8 @@ cvia/extracao/extradoc/erp-uau-v2.skill
 # NUNCA commitar.
 cvia/extracao/extradoc/teste_brecha_origemcv.py
 cvia/extracao/extradoc/teste_lead_origemcv.py
+
+# Documentos de status/apresentacao do projeto (citam IDs de infra e
+# incidentes de credencial): ficam so local, repo e publico.
+CVRINO_2.0/
+*.pptx
